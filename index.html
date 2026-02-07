@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NaviDock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              // Liquid Cream Palette
+              cream: {
+                50: '#FDFBF7',  /* Base Warm White */
+                100: '#F7F4EF', /* Secondary */
+                200: '#EAE5DD',
+                300: '#D6D1C9',
+              },
+              // Glass Borders
+              glass: {
+                border: 'rgba(255, 255, 255, 0.4)',
+                borderDark: 'rgba(255, 255, 255, 0.1)',
+              },
+              // Dark Mode: Deep Ocean Glass
+              cosmic: {
+                950: '#050508', /* Almost Black */
+                900: '#0F111A', /* Deep Blue-Black */
+                800: '#1E2130', 
+                700: '#334155',
+              },
+              brand: {
+                 DEFAULT: '#10B981', 
+                 hover: '#059669',
+                 light: '#D1FAE5',
+              },
+            },
+            fontFamily: {
+              sans: ['Inter', 'Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            },
+            boxShadow: {
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+              'glass-hover': '0 12px 40px 0 rgba(31, 38, 135, 0.1)',
+              'glass-dark': '0 8px 32px 0 rgba(0, 0, 0, 0.4)',
+              'glow': '0 0 20px rgba(16, 185, 129, 0.3)',
+              'glow-card': '0 10px 30px -10px rgba(100, 100, 200, 0.1)',
+            },
+            animation: {
+              'blob': 'blob 20s infinite', // Slower, smoother liquid movement
+              'fade-in-up': 'fadeInUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+            },
+            keyframes: {
+              blob: {
+                '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              },
+              fadeInUp: {
+                '0%': { opacity: '0', transform: 'translateY(15px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body {
+        /* Liquid Mint Gradient: Soft Emerald to Cool Grey. Reduces eye strain vs Pure White */
+        background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 50%, #f8fafc 100%);
+        color: #111827;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+      .dark body {
+        /* Deep Cosmic Gradient */
+        background: linear-gradient(135deg, #050508 0%, #0F111A 100%);
+        color: #F3F4F6;
+      }
+      
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+      }
+      
+      .dark .glass-panel {
+        background: rgba(20, 20, 30, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.45);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+      }
+      
+      .dark .glass-card {
+        background: rgba(30, 33, 48, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.1);
+        border-radius: 99px;
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+      }
+      
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
