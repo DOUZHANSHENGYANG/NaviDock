@@ -16,10 +16,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatName, setEditCatName] = useState('');
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
       e.preventDefault();
       if(newCatName.trim()) {
-          addCategory(newCatName);
+          await addCategory(newCatName);
           setNewCatName('');
           setIsAddingCat(false);
       }
@@ -31,16 +31,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
       setEditCatName(t(cat.name)); 
   }
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
       e.preventDefault();
       if(editingCatId && editCatName.trim()) {
-          updateCategory(editingCatId, editCatName.trim());
+          await updateCategory(editingCatId, editCatName.trim());
           setEditingCatId(null);
           setEditCatName('');
       }
   }
 
-  const handleDeleteCategory = (e: React.MouseEvent, id: string) => {
+  const handleDeleteCategory = async (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
       // Check count
       const count = sites.filter(s => s.categoryId === id).length;
@@ -53,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
       }
 
       if(confirmed) {
-          deleteCategory(id);
+          await deleteCategory(id);
       }
   };
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Moon, Sun, Download, Upload, Monitor } from 'lucide-react';
 import { useNavStore } from '../context/NavContext';
+import { Theme } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               ].map((opt: any) => (
                   <button 
                     key={opt.id}
-                    onClick={() => setTheme(opt.id)}
+                    onClick={() => { void setTheme(opt.id as Theme); }}
                     className={`flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all duration-300 backdrop-blur-sm
                     ${theme === opt.id 
                         ? 'border-indigo-500/20 bg-indigo-50/60 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 shadow-sm' 
@@ -62,13 +63,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             <SectionTitle>{t('settings.language')}</SectionTitle>
             <div className="flex gap-2 bg-slate-100/50 dark:bg-black/20 p-1 rounded-xl border border-white/20 dark:border-white/5">
               <button 
-                onClick={() => setLanguage('zh')}
+                onClick={() => { void setLanguage('zh'); }}
                 className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all ${language === 'zh' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >
                 中文
               </button>
               <button 
-                onClick={() => setLanguage('en')}
+                onClick={() => { void setLanguage('en'); }}
                 className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all ${language === 'en' ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >
                 English

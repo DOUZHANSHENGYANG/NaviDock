@@ -6,7 +6,7 @@ import { useNavStore } from '../context/NavContext';
 interface AddSiteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (site: SiteItem) => void;
+  onSave: (site: SiteItem) => Promise<void>;
   initialData?: SiteItem | null;
 }
 
@@ -66,7 +66,7 @@ const AddSiteModal: React.FC<AddSiteModalProps> = ({ isOpen, onClose, onSave, in
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) return;
     // Validate URLs based on category type
@@ -77,13 +77,13 @@ const AddSiteModal: React.FC<AddSiteModalProps> = ({ isOpen, onClose, onSave, in
     }
 
     if (initialData) {
-        updateSite(initialData.id, formData);
+        await updateSite(initialData.id, formData);
     } else {
         const newSite: SiteItem = {
             ...formData as SiteItem,
             id: crypto.randomUUID(),
         };
-        onSave(newSite);
+        await onSave(newSite);
     }
     onClose();
   };

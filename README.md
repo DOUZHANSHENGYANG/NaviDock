@@ -1,20 +1,69 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+﻿# NaviDock Prototype -> Tauri Desktop
 
-# Run and deploy your AI Studio app
+本项目已从纯前端原型升级为 **Tauri + Rust + SQLite3** 架构：
 
-This contains everything you need to run your app locally.
+- 前端：React + Vite
+- 桌面容器：Tauri v2
+- 数据层：Rust + rusqlite（SQLite3）
 
-View your app in AI Studio: https://ai.studio/apps/drive/1_cFKfQMT7UGSP-BB2CgfNbXW7hEbdcso
+## 快速开始
 
-## Run Locally
+### 1) 安装依赖
 
-**Prerequisites:**  Node.js
+```bash
+npm install
+```
 
+### 2) Web 原型模式（不启用 Tauri）
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm run dev
+```
+
+> 在纯浏览器模式下，会使用内存 mock 数据，便于快速调样式。
+
+### 3) Tauri 桌面模式（启用 SQLite 持久化）
+
+```bash
+npm run tauri:dev
+```
+
+### 4) 打包（调试构建，跳过安装包）
+
+```bash
+npm run tauri:build -- --debug --no-bundle
+```
+
+## SQLite 数据库存储位置
+
+应用首次运行会自动初始化数据库：
+
+- 文件名：`navidock.sqlite3`
+- 路径：Tauri `app_data_dir` 下（按操作系统自动分配）
+
+## Rust 命令接口
+
+前端通过 `@tauri-apps/api/core` 的 `invoke` 调用：
+
+- `load_app_data`
+- `create_site`
+- `update_site`
+- `delete_site`
+- `create_category`
+- `update_category`
+- `delete_category`
+- `update_setting`
+
+## 文档
+
+- 规划文档：`docs/plans/`
+- 数据库设计：`docs/database/`
+- 任务清单：`docs/checklists/`
+
+## Worktree 工作流（已采用）
+
+当前开发分支通过 `git worktree` 创建，建议后续继续沿用隔离开发：
+
+```bash
+git worktree add ../tauri-worktree -b feat/<topic>
+```

@@ -40,3 +40,12 @@ export interface NavState {
   theme: Theme;
   language: Language;
 }
+
+export interface PersistedAppData {
+  sites: SiteItem[];
+  categories: Category[];
+  environment: Environment;
+  viewMode: 'grid' | 'list';
+  theme: Theme;
+  language: Language;
+}

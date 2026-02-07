@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect } from 'react';
-import { SiteItem, Category, Environment, NavState, Theme, Language } from '../types';
+import React, { createContext, useContext, useReducer, ReactNode, useMemo, useEffect, useState } from 'react';
+import { SiteItem, Category, Environment, NavState, Theme, Language, PersistedAppData } from '../types';
+import { desktopApi } from '../services/desktopApi';
 
 // --- I18n Data ---
 const TRANSLATIONS = {
@@ -146,6 +147,7 @@ const MOCK_SITES: SiteItem[] = [
 // --- Context & Reducer ---
 
 type Action =
+  | { type: 'HYDRATE'; payload: PersistedAppData }
   | { type: 'ADD_SITE'; payload: SiteItem }
   | { type: 'UPDATE_SITE'; payload: { id: string; data: Partial<SiteItem> } }
   | { type: 'DELETE_SITE'; payload: string }
@@ -163,19 +165,21 @@ type Action =
 interface NavContextType extends NavState {
   filteredSites: SiteItem[];
   allTags: string[];
-  addSite: (site: SiteItem) => void;
-  updateSite: (id: string, data: Partial<SiteItem>) => void;
-  deleteSite: (id: string) => void;
-  addCategory: (name: string) => void;
-  updateCategory: (id: string, name: string) => void;
-  deleteCategory: (id: string) => void;
-  setEnv: (env: Environment) => void;
+  isHydrated: boolean;
+  isDesktopPersistenceEnabled: boolean;
+  addSite: (site: SiteItem) => Promise<void>;
+  updateSite: (id: string, data: Partial<SiteItem>) => Promise<void>;
+  deleteSite: (id: string) => Promise<void>;
+  addCategory: (name: string) => Promise<void>;
+  updateCategory: (id: string, name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  setEnv: (env: Environment) => Promise<void>;
   setSearch: (query: string) => void;
   setCategory: (id: string | null) => void;
   toggleTag: (tag: string) => void;
-  setViewMode: (mode: 'grid' | 'list') => void;
-  setTheme: (theme: Theme) => void;
-  setLanguage: (lang: Language) => void;
+  setViewMode: (mode: 'grid' | 'list') => Promise<void>;
+  setTheme: (theme: Theme) => Promise<void>;
+  setLanguage: (lang: Language) => Promise<void>;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -195,6 +199,16 @@ const initialState: NavState = {
 
 function navReducer(state: NavState, action: Action): NavState {
   switch (action.type) {
+    case 'HYDRATE':
+      return {
+        ...state,
+        sites: action.payload.sites,
+        categories: action.payload.categories,
+        environment: action.payload.environment,
+        viewMode: action.payload.viewMode,
+        theme: action.payload.theme,
+        language: action.payload.language,
+      };
     case 'ADD_SITE':
       return { ...state, sites: [...state.sites, action.payload] };
     case 'UPDATE_SITE':
@@ -250,6 +264,35 @@ function navReducer(state: NavState, action: Action): NavState {
 
 export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(navReducer, initialState);
+  const [isHydrated, setIsHydrated] = useState(!desktopApi.isEnabled);
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrateFromDesktop = async () => {
+      if (!desktopApi.isEnabled) {
+        setIsHydrated(true);
+        return;
+      }
+
+      try {
+        const persisted = await desktopApi.loadAppData();
+        if (!active) return;
+        dispatch({ type: 'HYDRATE', payload: persisted });
+      } catch (error) {
+        console.error('[NavContext] Failed to hydrate from SQLite, fallback to mock data.', error);
+      } finally {
+        if (active) {
+          setIsHydrated(true);
+        }
+      }
+    };
+
+    hydrateFromDesktop();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // --- Theme Effect ---
   useEffect(() => {
@@ -318,35 +361,111 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- Actions ---
 
-  const addSite = (site: SiteItem) => dispatch({ type: 'ADD_SITE', payload: site });
-  const updateSite = (id: string, data: Partial<SiteItem>) => dispatch({ type: 'UPDATE_SITE', payload: { id, data } });
-  const deleteSite = (id: string) => dispatch({ type: 'DELETE_SITE', payload: id });
-  
-  const addCategory = (name: string) => {
+  const persistSetting = async (key: 'theme' | 'language' | 'environment' | 'viewMode', value: string) => {
+    if (!desktopApi.isEnabled) return;
+    try {
+      await desktopApi.updateSetting(key, value);
+    } catch (error) {
+      console.error(`[NavContext] Failed to persist setting (${key}).`, error);
+    }
+  };
+
+  const addSite = async (site: SiteItem) => {
+    if (desktopApi.isEnabled) {
+      const created = await desktopApi.createSite(site);
+      dispatch({ type: 'ADD_SITE', payload: created });
+      return;
+    }
+    dispatch({ type: 'ADD_SITE', payload: site });
+  };
+
+  const updateSite = async (id: string, data: Partial<SiteItem>) => {
+    const existing = state.sites.find(s => s.id === id);
+    if (!existing) return;
+
+    const mergedSite: SiteItem = {
+      ...existing,
+      ...data,
+      envConfig: {
+        ...existing.envConfig,
+        ...(data.envConfig || {}),
+      },
+      tags: data.tags ?? existing.tags,
+    };
+
+    if (desktopApi.isEnabled) {
+      const updated = await desktopApi.updateSite(mergedSite);
+      dispatch({ type: 'UPDATE_SITE', payload: { id, data: updated } });
+      return;
+    }
+    dispatch({ type: 'UPDATE_SITE', payload: { id, data } });
+  };
+
+  const deleteSite = async (id: string) => {
+    if (desktopApi.isEnabled) {
+      await desktopApi.deleteSite(id);
+    }
+    dispatch({ type: 'DELETE_SITE', payload: id });
+  };
+
+  const addCategory = async (name: string) => {
+    if (desktopApi.isEnabled) {
+      const created = await desktopApi.createCategory(name);
+      dispatch({ type: 'ADD_CATEGORY', payload: created });
+      return;
+    }
     const newCat: Category = {
-        id: `cat-${Date.now()}`,
-        name: name,
-        icon: 'Folder',
-        type: 'user'
+      id: `cat-${Date.now()}`,
+      name,
+      icon: 'Folder',
+      type: 'user',
     };
     dispatch({ type: 'ADD_CATEGORY', payload: newCat });
-  }
-  const updateCategory = (id: string, name: string) => dispatch({ type: 'UPDATE_CATEGORY', payload: { id, name } });
-  const deleteCategory = (id: string) => dispatch({ type: 'DELETE_CATEGORY', payload: id });
+  };
 
-  const setEnv = (env: Environment) => dispatch({ type: 'SET_ENV', payload: env });
+  const updateCategory = async (id: string, name: string) => {
+    if (desktopApi.isEnabled) {
+      const updated = await desktopApi.updateCategory(id, name);
+      dispatch({ type: 'UPDATE_CATEGORY', payload: { id, name: updated.name } });
+      return;
+    }
+    dispatch({ type: 'UPDATE_CATEGORY', payload: { id, name } });
+  };
+
+  const deleteCategory = async (id: string) => {
+    if (desktopApi.isEnabled) {
+      await desktopApi.deleteCategory(id);
+    }
+    dispatch({ type: 'DELETE_CATEGORY', payload: id });
+  };
+
+  const setEnv = async (env: Environment) => {
+    dispatch({ type: 'SET_ENV', payload: env });
+    await persistSetting('environment', env);
+  };
   const setSearch = (query: string) => dispatch({ type: 'SET_SEARCH', payload: query });
   const setCategory = (id: string | null) => dispatch({ type: 'SET_CATEGORY', payload: id });
   const toggleTag = (tag: string) => dispatch({ type: 'TOGGLE_TAG', payload: tag });
-  const setViewMode = (mode: 'grid' | 'list') => dispatch({ type: 'SET_VIEW_MODE', payload: mode });
-  const setTheme = (theme: Theme) => dispatch({ type: 'SET_THEME', payload: theme });
-  const setLanguage = (lang: Language) => dispatch({ type: 'SET_LANGUAGE', payload: lang });
+  const setViewMode = async (mode: 'grid' | 'list') => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: mode });
+    await persistSetting('viewMode', mode);
+  };
+  const setTheme = async (theme: Theme) => {
+    dispatch({ type: 'SET_THEME', payload: theme });
+    await persistSetting('theme', theme);
+  };
+  const setLanguage = async (lang: Language) => {
+    dispatch({ type: 'SET_LANGUAGE', payload: lang });
+    await persistSetting('language', lang);
+  };
 
   return (
     <NavContext.Provider value={{ 
         ...state, 
         filteredSites, 
         allTags, 
+        isHydrated,
+        isDesktopPersistenceEnabled: desktopApi.isEnabled,
         addSite, 
         updateSite, 
         deleteSite,

@@ -21,6 +21,7 @@ const App: React.FC = () => {
     setViewMode,
     addSite,
     selectedCategoryId,
+    isHydrated,
     t
   } = useNavStore();
 
@@ -57,6 +58,14 @@ const App: React.FC = () => {
   // Check if we are in the "System Development" category (id: cat-system-dev)
   const isSystemDevCategory = selectedCategoryId === 'cat-system-dev';
 
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 dark:text-slate-300">
+        <div className="glass-panel rounded-2xl px-6 py-4 font-semibold">Initializing workspace...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen transition-colors duration-500 font-sans selection:bg-brand-DEFAULT/30 relative overflow-hidden">
       
@@ -87,7 +96,7 @@ const App: React.FC = () => {
                     {isSystemDevCategory ? (
                          <div className="flex glass-panel p-1 rounded-2xl shadow-sm">
                             <button
-                                onClick={() => setEnv('PROD')}
+                                onClick={() => { void setEnv('PROD'); }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                                     environment === 'PROD' 
                                     ? 'bg-white dark:bg-white/10 text-orange-500 shadow-sm' 
@@ -97,7 +106,7 @@ const App: React.FC = () => {
                                 <Rocket size={14} /> {t('nav.prod')}
                             </button>
                             <button
-                                onClick={() => setEnv('DEV')}
+                                onClick={() => { void setEnv('DEV'); }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                                     environment === 'DEV' 
                                     ? 'bg-white dark:bg-white/10 text-brand-DEFAULT shadow-sm' 
@@ -134,13 +143,13 @@ const App: React.FC = () => {
                          
                          <div className="flex items-center glass-panel p-1 rounded-xl shadow-sm">
                             <button 
-                                onClick={() => setViewMode('grid')} 
+                                onClick={() => { void setViewMode('grid'); }} 
                                 className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-white/10 text-brand-DEFAULT shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 <LayoutGrid size={18} />
                             </button>
                             <button 
-                                onClick={() => setViewMode('list')} 
+                                onClick={() => { void setViewMode('list'); }} 
                                 className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-white/10 text-brand-DEFAULT shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                             >
                                 <ListIcon size={18} />

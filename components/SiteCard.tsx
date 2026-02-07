@@ -53,11 +53,11 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, currentEnv, onEdit }) => {
     return <Globe size={size} />;
   }
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleDelete = async (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if(window.confirm(`Delete ${site.title}?`)) {
-          deleteSite(site.id);
+          await deleteSite(site.id);
       }
   }
 
