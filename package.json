@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "release:check": "npm run build && cargo check --manifest-path src-tauri/Cargo.toml",
+    "release:bundle": "tauri build --ci --bundles nsis,msi",
+    "release:win": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

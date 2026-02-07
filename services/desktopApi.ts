@@ -35,4 +35,9 @@ export const desktopApi = {
 
   updateSetting: (key: AppSettingKey, value: string): Promise<void> =>
     callCommand<void>('update_setting', { key, value }),
+
+  exportConfig: (): Promise<string> => callCommand<string>('export_config'),
+
+  importConfig: (configJson: string): Promise<PersistedAppData> =>
+    callCommand<PersistedAppData>('import_config', { configJson }),
 };

@@ -34,6 +34,14 @@ npm run tauri:dev
 npm run tauri:build -- --debug --no-bundle
 ```
 
+### 5) Release 打包（含安装包）
+
+```bash
+npm run release:win
+```
+
+> 该命令会生成 NSIS + MSI 安装包。
+
 ## SQLite 数据库存储位置
 
 应用首次运行会自动初始化数据库：
@@ -53,6 +61,14 @@ npm run tauri:build -- --debug --no-bundle
 - `update_category`
 - `delete_category`
 - `update_setting`
+- `export_config`
+- `import_config`
+
+## 导入/导出配置
+
+- 入口：设置弹窗 -> 数据管理
+- 导出：下载 `navidock-config-*.json`
+- 导入：选择 JSON 文件，导入后自动刷新当前状态（桌面模式会同步写入 SQLite）
 
 ## 文档
 

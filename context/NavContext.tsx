@@ -180,6 +180,8 @@ interface NavContextType extends NavState {
   setViewMode: (mode: 'grid' | 'list') => Promise<void>;
   setTheme: (theme: Theme) => Promise<void>;
   setLanguage: (lang: Language) => Promise<void>;
+  exportConfig: () => Promise<void>;
+  importConfigFromText: (configText: string) => Promise<void>;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -208,6 +210,9 @@ function navReducer(state: NavState, action: Action): NavState {
         viewMode: action.payload.viewMode,
         theme: action.payload.theme,
         language: action.payload.language,
+        searchQuery: '',
+        selectedCategoryId: null,
+        selectedTags: [],
       };
     case 'ADD_SITE':
       return { ...state, sites: [...state.sites, action.payload] };
@@ -360,6 +365,58 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [state.sites, state.selectedCategoryId, state.searchQuery, state.selectedTags, state.categories, state.language]);
 
   // --- Actions ---
+  const toPersistedStateSnapshot = (): PersistedAppData => ({
+    sites: state.sites,
+    categories: state.categories,
+    environment: state.environment,
+    viewMode: state.viewMode,
+    theme: state.theme,
+    language: state.language,
+  });
+
+  const readPersistedDataFromImport = (raw: string): PersistedAppData => {
+    const parsed = JSON.parse(raw);
+    const maybeData =
+      parsed && typeof parsed === 'object' && 'data' in parsed
+        ? (parsed as { data: unknown }).data
+        : parsed;
+
+    if (!maybeData || typeof maybeData !== 'object') {
+      throw new Error('Invalid import payload.');
+    }
+
+    const requiredKeys: Array<keyof PersistedAppData> = [
+      'sites',
+      'categories',
+      'environment',
+      'viewMode',
+      'theme',
+      'language',
+    ];
+
+    for (const key of requiredKeys) {
+      if (!(key in (maybeData as Record<string, unknown>))) {
+        throw new Error(`Missing key in import payload: ${key}`);
+      }
+    }
+
+    return maybeData as PersistedAppData;
+  };
+
+  const downloadJson = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const buildExportFilename = () => {
+    const formatted = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    return `navidock-config-${formatted}.json`;
+  };
 
   const persistSetting = async (key: 'theme' | 'language' | 'environment' | 'viewMode', value: string) => {
     if (!desktopApi.isEnabled) return;
@@ -459,6 +516,38 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await persistSetting('language', lang);
   };
 
+  const exportConfig = async () => {
+    const configJson = desktopApi.isEnabled
+      ? await desktopApi.exportConfig()
+      : JSON.stringify(
+          {
+            formatVersion: '1.0.0',
+            exportedAt: new Date().toISOString(),
+            data: toPersistedStateSnapshot(),
+          },
+          null,
+          2,
+        );
+
+    downloadJson(buildExportFilename(), configJson);
+  };
+
+  const importConfigFromText = async (configText: string) => {
+    const raw = configText.trim();
+    if (!raw) {
+      throw new Error('Import content is empty.');
+    }
+
+    if (desktopApi.isEnabled) {
+      const imported = await desktopApi.importConfig(raw);
+      dispatch({ type: 'HYDRATE', payload: imported });
+      return;
+    }
+
+    const parsed = readPersistedDataFromImport(raw);
+    dispatch({ type: 'HYDRATE', payload: parsed });
+  };
+
   return (
     <NavContext.Provider value={{ 
         ...state, 
@@ -479,6 +568,8 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setViewMode, 
         setTheme, 
         setLanguage, 
+        exportConfig,
+        importConfigFromText,
         t 
     }}>
       {children}

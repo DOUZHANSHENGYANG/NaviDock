@@ -1,4 +1,4 @@
-mod db;
+﻿mod db;
 mod models;
 
 use db::AppState;
@@ -10,9 +10,9 @@ fn load_app_data(state: tauri::State<'_, AppState>) -> Result<PersistedAppData, 
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
-    db::load_app_data(&conn).map_err(|error| format!("读取应用数据失败: {error}"))
+    db::load_app_data(&conn).map_err(|error| format!("Failed to load app data: {error}"))
 }
 
 #[tauri::command]
@@ -20,7 +20,7 @@ fn create_site(state: tauri::State<'_, AppState>, site: SiteItem) -> Result<Site
     let mut conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::create_site(&mut conn, site)
 }
@@ -30,7 +30,7 @@ fn update_site(state: tauri::State<'_, AppState>, site: SiteItem) -> Result<Site
     let mut conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::update_site(&mut conn, site)
 }
@@ -40,7 +40,7 @@ fn delete_site(state: tauri::State<'_, AppState>, id: String) -> Result<(), Stri
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::delete_site(&conn, &id)
 }
@@ -50,7 +50,7 @@ fn create_category(state: tauri::State<'_, AppState>, name: String) -> Result<Ca
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::create_category(&conn, &name)
 }
@@ -64,7 +64,7 @@ fn update_category(
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::update_category(&conn, &id, &name)
 }
@@ -74,7 +74,7 @@ fn delete_category(state: tauri::State<'_, AppState>, id: String) -> Result<(), 
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::delete_category(&conn, &id)
 }
@@ -88,9 +88,32 @@ fn update_setting(
     let conn = state
         .conn
         .lock()
-        .map_err(|error| format!("数据库连接锁定失败: {error}"))?;
+        .map_err(|error| format!("Database lock failed: {error}"))?;
 
     db::update_setting(&conn, &key, &value)
+}
+
+#[tauri::command]
+fn export_config(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|error| format!("Database lock failed: {error}"))?;
+
+    db::export_config(&conn)
+}
+
+#[tauri::command]
+fn import_config(
+    state: tauri::State<'_, AppState>,
+    config_json: String,
+) -> Result<PersistedAppData, String> {
+    let mut conn = state
+        .conn
+        .lock()
+        .map_err(|error| format!("Database lock failed: {error}"))?;
+
+    db::import_config(&mut conn, &config_json)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -118,7 +141,9 @@ pub fn run() {
             create_category,
             update_category,
             delete_category,
-            update_setting
+            update_setting,
+            export_config,
+            import_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
