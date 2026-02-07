@@ -158,10 +158,13 @@ const App: React.FC = () => {
                          
                          <button 
                             onClick={() => { setEditingSite(null); setIsModalOpen(true); }}
-                            className="flex items-center gap-2 bg-gradient-to-r from-brand-DEFAULT to-emerald-400 text-white px-6 py-3 rounded-full font-bold text-sm hover:shadow-lg hover:shadow-brand-DEFAULT/30 hover:scale-105 active:scale-95 transition-all"
+                            className="group relative flex items-center gap-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:-translate-y-0.5 active:translate-y-0 transition-all"
                          >
-                            <Plus size={18} />
-                            <span className="hidden sm:inline">New Tool</span>
+                            <span className="absolute inset-0 rounded-2xl bg-white/0 group-hover:bg-white/10 transition-colors"></span>
+                            <span className="relative w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center backdrop-blur-sm">
+                              <Plus size={16} />
+                            </span>
+                            <span className="relative hidden sm:inline">{t('app.add_service')}</span>
                          </button>
                     </div>
                 </div>

@@ -39,4 +39,10 @@ pub struct PersistedAppData {
     pub view_mode: String,
     pub theme: String,
     pub language: String,
+    #[serde(default = "default_import_category_id")]
+    pub import_category_id: String,
+}
+
+fn default_import_category_id() -> String {
+    "cat-imported".to_string()
 }

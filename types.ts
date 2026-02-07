@@ -39,6 +39,7 @@ export interface NavState {
   viewMode: 'grid' | 'list';
   theme: Theme;
   language: Language;
+  importCategoryId: string;
 }
 
 export interface PersistedAppData {
@@ -48,4 +49,5 @@ export interface PersistedAppData {
   viewMode: 'grid' | 'list';
   theme: Theme;
   language: Language;
+  importCategoryId: string;
 }

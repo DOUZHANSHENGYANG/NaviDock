@@ -59,6 +59,7 @@
 - `language`
 - `environment`
 - `viewMode`
+- `importCategoryId`
 
 ## 3. 初始化策略
 
@@ -67,7 +68,10 @@
 1. 自动建表（`CREATE TABLE IF NOT EXISTS`）
 2. 检查是否为空库：
    - 空则插入默认分类与默认站点
-3. 初始化默认设置（`INSERT OR IGNORE`）
+3. 强制确保存在 `cat-imported`（导入分类）：
+   - `INSERT OR IGNORE` 补齐该分类
+4. 初始化默认设置（`INSERT OR IGNORE`）：
+   - 包含 `importCategoryId = cat-imported`
 
 ## 4. 命令与数据映射
 
@@ -76,8 +80,28 @@
 - `create_category/update_category/delete_category` -> 分类增删改（仅 user 分类可编辑删除）
 - `update_setting` -> 偏好设置更新
 
-## 5. 约束与校验
+## 5. 导入配置兼容策略（新增）
+
+导入 JSON 配置时：
+
+1. 先全量替换分类与站点（事务内）。
+2. `importCategoryId` 使用如下回退策略：
+   - 若导入值在分类中存在：直接使用；
+   - 若不存在：优先选第一条 `user` 分类；
+   - 若仍不可用：回退到第一条分类 ID。
+3. 最终写回 `app_settings.importCategoryId`，确保导入后状态可用。
+
+## 6. 约束与校验
 
 - Rust 层校验站点状态与视图类型合法性
 - 标签去空、去重（大小写不敏感）
 - 系统分类禁止删除/编辑
+
+## 7. 书签导入重复 URL 策略（2026-02-07 更新）
+
+- 解析书签 HTML 时先做文件内 URL 去重；
+- 导入阶段再检查数据库现有 URL（含已有站点的 dev/prod URL）：
+  - 若 URL 已存在：跳过该条，不新建站点；
+  - 若 URL 不存在：正常导入；
+- 导入完成后提示 `imported` 与 `skipped` 统计，便于用户感知实际写入结果。
+

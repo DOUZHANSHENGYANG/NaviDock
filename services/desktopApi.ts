@@ -1,7 +1,7 @@
 ﻿import { invoke } from '@tauri-apps/api/core';
 import { Category, PersistedAppData, SiteItem } from '../types';
 
-export type AppSettingKey = 'theme' | 'language' | 'environment' | 'viewMode';
+export type AppSettingKey = 'theme' | 'language' | 'environment' | 'viewMode' | 'importCategoryId';
 
 const hasTauriRuntime = () =>
   typeof window !== 'undefined' &&

@@ -45,6 +45,18 @@ const TRANSLATIONS = {
     'cat.tools': '常用工具',
     'cat.docs': '文档资料',
     'cat.design': '设计资源',
+    'cat.imported': '导入分类',
+    'settings.category_mgmt': '分类管理',
+    'settings.import_bookmarks': '导入书签',
+    'settings.default_import_category': '默认导入分类',
+    'settings.import_mode': '导入模式',
+    'settings.mode_single': '导入到单一分类',
+    'settings.mode_folder': '按书签文件夹自动分组',
+    'settings.bookmark_file': '书签文件',
+    'settings.select_file': '选择 HTML 文件',
+    'settings.no_file': '未选择文件',
+    'settings.preview_count': '预览数量',
+    'settings.start_import': '开始导入',
     'confirm.delete_cat_items': '该分类下包含 {count} 个网站，确定要删除吗？此操作无法撤销。',
     'confirm.delete_cat_empty': '确定要删除此空分类吗？'
   },
@@ -89,6 +101,18 @@ const TRANSLATIONS = {
     'cat.tools': 'Tools',
     'cat.docs': 'Docs',
     'cat.design': 'Design',
+    'cat.imported': 'Imported',
+    'settings.category_mgmt': 'Category Manager',
+    'settings.import_bookmarks': 'Import Bookmarks',
+    'settings.default_import_category': 'Default Import Category',
+    'settings.import_mode': 'Import Mode',
+    'settings.mode_single': 'Import into Single Category',
+    'settings.mode_folder': 'Group by Bookmark Folder',
+    'settings.bookmark_file': 'Bookmark File',
+    'settings.select_file': 'Choose HTML File',
+    'settings.no_file': 'No file selected',
+    'settings.preview_count': 'Preview Count',
+    'settings.start_import': 'Start Import',
     'confirm.delete_cat_items': 'This category contains {count} items. Are you sure you want to delete it? This cannot be undone.',
     'confirm.delete_cat_empty': 'Delete this empty category?'
   }
@@ -99,6 +123,7 @@ const MOCK_CATEGORIES: Category[] = [
   { id: 'cat-system-dev', name: 'cat.system_dev', icon: 'Terminal', type: 'system' },
   { id: 'cat-tools', name: 'cat.tools', icon: 'Wrench', type: 'user' },
   { id: 'cat-docs', name: 'cat.docs', icon: 'Book', type: 'user' },
+  { id: 'cat-imported', name: 'cat.imported', icon: 'Folder', type: 'user' },
 ];
 
 const MOCK_SITES: SiteItem[] = [
@@ -160,7 +185,8 @@ type Action =
   | { type: 'TOGGLE_TAG'; payload: string }
   | { type: 'SET_VIEW_MODE'; payload: 'grid' | 'list' }
   | { type: 'SET_THEME'; payload: Theme }
-  | { type: 'SET_LANGUAGE'; payload: Language };
+  | { type: 'SET_LANGUAGE'; payload: Language }
+  | { type: 'SET_IMPORT_CATEGORY'; payload: string };
 
 interface NavContextType extends NavState {
   filteredSites: SiteItem[];
@@ -170,7 +196,7 @@ interface NavContextType extends NavState {
   addSite: (site: SiteItem) => Promise<void>;
   updateSite: (id: string, data: Partial<SiteItem>) => Promise<void>;
   deleteSite: (id: string) => Promise<void>;
-  addCategory: (name: string) => Promise<void>;
+  addCategory: (name: string) => Promise<Category>;
   updateCategory: (id: string, name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   setEnv: (env: Environment) => Promise<void>;
@@ -180,6 +206,7 @@ interface NavContextType extends NavState {
   setViewMode: (mode: 'grid' | 'list') => Promise<void>;
   setTheme: (theme: Theme) => Promise<void>;
   setLanguage: (lang: Language) => Promise<void>;
+  setImportCategory: (categoryId: string) => Promise<void>;
   exportConfig: () => Promise<void>;
   importConfigFromText: (configText: string) => Promise<void>;
   t: (key: string, params?: Record<string, any>) => string;
@@ -197,6 +224,22 @@ const initialState: NavState = {
   viewMode: 'grid',
   theme: 'system',
   language: 'zh',
+  importCategoryId: 'cat-imported',
+};
+
+const resolveImportCategoryId = (categories: Category[], preferredId?: string) => {
+  if (categories.length === 0) {
+    return 'cat-imported';
+  }
+
+  if (preferredId && categories.some(category => category.id === preferredId)) {
+    return preferredId;
+  }
+
+  return (
+    categories.find(category => category.type === 'user')?.id ||
+    categories[0].id
+  );
 };
 
 function navReducer(state: NavState, action: Action): NavState {
@@ -210,6 +253,10 @@ function navReducer(state: NavState, action: Action): NavState {
         viewMode: action.payload.viewMode,
         theme: action.payload.theme,
         language: action.payload.language,
+        importCategoryId: resolveImportCategoryId(
+          action.payload.categories,
+          action.payload.importCategoryId,
+        ),
         searchQuery: '',
         selectedCategoryId: null,
         selectedTags: [],
@@ -235,13 +282,19 @@ function navReducer(state: NavState, action: Action): NavState {
           c.id === action.payload.id ? { ...c, name: action.payload.name } : c
         )
       };
-    case 'DELETE_CATEGORY':
+    case 'DELETE_CATEGORY': {
+      const nextCategories = state.categories.filter(c => c.id !== action.payload);
       return {
         ...state,
-        categories: state.categories.filter(c => c.id !== action.payload),
+        categories: nextCategories,
         sites: state.sites.filter(s => s.categoryId !== action.payload), // Cascade delete sites? Or keep orphans? Let's cascade based on prompt warning.
-        selectedCategoryId: state.selectedCategoryId === action.payload ? null : state.selectedCategoryId
+        selectedCategoryId: state.selectedCategoryId === action.payload ? null : state.selectedCategoryId,
+        importCategoryId:
+          state.importCategoryId === action.payload
+            ? resolveImportCategoryId(nextCategories)
+            : state.importCategoryId,
       };
+    }
     case 'SET_ENV':
       return { ...state, environment: action.payload };
     case 'SET_SEARCH':
@@ -262,6 +315,11 @@ function navReducer(state: NavState, action: Action): NavState {
       return { ...state, theme: action.payload };
     case 'SET_LANGUAGE':
       return { ...state, language: action.payload };
+    case 'SET_IMPORT_CATEGORY':
+      return {
+        ...state,
+        importCategoryId: resolveImportCategoryId(state.categories, action.payload),
+      };
     default:
       return state;
   }
@@ -372,6 +430,7 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     viewMode: state.viewMode,
     theme: state.theme,
     language: state.language,
+    importCategoryId: state.importCategoryId,
   });
 
   const readPersistedDataFromImport = (raw: string): PersistedAppData => {
@@ -400,7 +459,14 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    return maybeData as PersistedAppData;
+    const data = maybeData as PersistedAppData & { importCategoryId?: string };
+    return {
+      ...data,
+      importCategoryId: resolveImportCategoryId(
+        data.categories,
+        data.importCategoryId,
+      ),
+    };
   };
 
   const downloadJson = (filename: string, content: string) => {
@@ -418,7 +484,10 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return `navidock-config-${formatted}.json`;
   };
 
-  const persistSetting = async (key: 'theme' | 'language' | 'environment' | 'viewMode', value: string) => {
+  const persistSetting = async (
+    key: 'theme' | 'language' | 'environment' | 'viewMode' | 'importCategoryId',
+    value: string,
+  ) => {
     if (!desktopApi.isEnabled) return;
     try {
       await desktopApi.updateSetting(key, value);
@@ -469,7 +538,7 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (desktopApi.isEnabled) {
       const created = await desktopApi.createCategory(name);
       dispatch({ type: 'ADD_CATEGORY', payload: created });
-      return;
+      return created;
     }
     const newCat: Category = {
       id: `cat-${Date.now()}`,
@@ -478,6 +547,7 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       type: 'user',
     };
     dispatch({ type: 'ADD_CATEGORY', payload: newCat });
+    return newCat;
   };
 
   const updateCategory = async (id: string, name: string) => {
@@ -490,10 +560,20 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const deleteCategory = async (id: string) => {
+    const nextCategories = state.categories.filter(category => category.id !== id);
+    const nextImportCategoryId =
+      state.importCategoryId === id
+        ? resolveImportCategoryId(nextCategories)
+        : state.importCategoryId;
+
     if (desktopApi.isEnabled) {
       await desktopApi.deleteCategory(id);
     }
     dispatch({ type: 'DELETE_CATEGORY', payload: id });
+
+    if (nextImportCategoryId !== state.importCategoryId) {
+      await persistSetting('importCategoryId', nextImportCategoryId);
+    }
   };
 
   const setEnv = async (env: Environment) => {
@@ -514,6 +594,12 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setLanguage = async (lang: Language) => {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
     await persistSetting('language', lang);
+  };
+
+  const setImportCategory = async (categoryId: string) => {
+    const resolvedCategoryId = resolveImportCategoryId(state.categories, categoryId);
+    dispatch({ type: 'SET_IMPORT_CATEGORY', payload: resolvedCategoryId });
+    await persistSetting('importCategoryId', resolvedCategoryId);
   };
 
   const exportConfig = async () => {
@@ -568,6 +654,7 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setViewMode, 
         setTheme, 
         setLanguage, 
+        setImportCategory,
         exportConfig,
         importConfigFromText,
         t 

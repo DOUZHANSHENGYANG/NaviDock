@@ -1,0 +1,224 @@
+﻿import React, { useMemo, useState } from 'react';
+import { X, Plus, Pencil, Trash2, Save } from 'lucide-react';
+import { useNavStore } from '../context/NavContext';
+import { Category } from '../types';
+
+interface CategoryManagerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onClose }) => {
+  const {
+    categories,
+    sites,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    importCategoryId,
+    setImportCategory,
+    language,
+    t,
+  } = useNavStore();
+
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const categorySiteCount = useMemo(() => {
+    const counter = new Map<string, number>();
+    for (const site of sites) {
+      counter.set(site.categoryId, (counter.get(site.categoryId) || 0) + 1);
+    }
+    return counter;
+  }, [sites]);
+
+  if (!isOpen) return null;
+
+  const beginEdit = (category: Category) => {
+    setEditingCategory(category);
+    setEditingName(t(category.name));
+  };
+
+  const submitNewCategory = async () => {
+    const value = newCategoryName.trim();
+    if (!value) return;
+
+    try {
+      setIsSaving(true);
+      await addCategory(value);
+      setNewCategoryName('');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!editingCategory) return;
+    const value = editingName.trim();
+    if (!value) return;
+
+    try {
+      setIsSaving(true);
+      await updateCategory(editingCategory.id, value);
+      setEditingCategory(null);
+      setEditingName('');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const submitDelete = async (category: Category) => {
+    const count = categorySiteCount.get(category.id) || 0;
+    const confirmed = count > 0
+      ? window.confirm(t('confirm.delete_cat_items', { count }))
+      : window.confirm(t('confirm.delete_cat_empty'));
+
+    if (!confirmed) return;
+
+    try {
+      setIsSaving(true);
+      await deleteCategory(category.id);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateImportCategory = async (categoryId: string) => {
+    try {
+      setIsSaving(true);
+      await setImportCategory(categoryId);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative glass-panel w-full max-w-3xl rounded-[28px] shadow-2xl overflow-hidden">
+        <div className="px-8 py-5 border-b border-white/40 dark:border-white/10 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('settings.category_mgmt')}</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              {language === 'zh' ? '集中管理分类、重命名、删除与默认导入分类。' : 'Centralized category create, rename, delete and default import category.'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <input
+              value={newCategoryName}
+              onChange={event => setNewCategoryName(event.target.value)}
+              placeholder={language === 'zh' ? '输入新分类名称' : 'Enter a new category name'}
+              className="w-full bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-DEFAULT/20"
+            />
+            <button
+              onClick={() => { void submitNewCategory(); }}
+              disabled={isSaving || !newCategoryName.trim()}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-DEFAULT to-emerald-500 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-60"
+            >
+              <Plus size={16} />
+              {language === 'zh' ? '新增分类' : 'Add Category'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                {t('settings.default_import_category')}
+              </p>
+              <select
+                value={importCategoryId}
+                onChange={event => { void updateImportCategory(event.target.value); }}
+                className="w-full bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-DEFAULT/20"
+              >
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {t(category.name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="text-xs text-slate-400 flex items-end">
+              {language === 'zh'
+                ? '导入书签时会默认使用此分类，也可在导入弹窗中临时切换。'
+                : 'Bookmark import uses this category by default, and can still be changed in import modal.'}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {categories.map(category => {
+              const count = categorySiteCount.get(category.id) || 0;
+              const isEditing = editingCategory?.id === category.id;
+              const isSystem = category.type === 'system';
+
+              return (
+                <div key={category.id} className="glass-card rounded-2xl p-4 border border-white/30 dark:border-white/10">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{t(category.name)}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSystem ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                          {isSystem ? 'SYSTEM' : 'USER'}
+                        </span>
+                        {importCategoryId === category.id && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand-DEFAULT">
+                            {language === 'zh' ? '默认导入' : 'Default Import'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">{language === 'zh' ? `${count} 个网址` : `${count} sites`}</p>
+                    </div>
+
+                    {!isSystem && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => beginEdit(category)}
+                          className="p-2 rounded-lg hover:bg-white/60 dark:hover:bg-white/10 text-slate-500"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => { void submitDelete(category); }}
+                          className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {isEditing && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <input
+                        value={editingName}
+                        onChange={event => setEditingName(event.target.value)}
+                        className="flex-1 bg-white/70 dark:bg-black/30 border border-white/40 dark:border-white/10 rounded-xl px-4 py-2 text-sm"
+                      />
+                      <button
+                        onClick={() => { void submitEdit(); }}
+                        disabled={!editingName.trim()}
+                        className="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-bold disabled:opacity-60 flex items-center gap-1"
+                      >
+                        <Save size={14} />
+                        {language === 'zh' ? '保存' : 'Save'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CategoryManagerModal;

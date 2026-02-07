@@ -77,6 +77,7 @@ pub fn load_app_data(conn: &Connection) -> rusqlite::Result<PersistedAppData> {
         view_mode: get_setting(conn, "viewMode", "grid")?,
         theme: get_setting(conn, "theme", "system")?,
         language: get_setting(conn, "language", "zh")?,
+        import_category_id: get_setting(conn, "importCategoryId", "cat-imported")?,
     })
 }
 
@@ -357,11 +358,18 @@ fn seed_default_data(conn: &Connection) -> Result<(), String> {
             INSERT INTO app_categories (id, name, icon, type) VALUES
               ('cat-system-dev', 'cat.system_dev', 'Terminal', 'system'),
               ('cat-tools', 'cat.tools', 'Wrench', 'user'),
-              ('cat-docs', 'cat.docs', 'Book', 'user');
+              ('cat-docs', 'cat.docs', 'Book', 'user'),
+              ('cat-imported', 'cat.imported', 'Folder', 'user');
             "#,
         )
         .map_err(|error| format!("Failed to seed default categories: {error}"))?;
     }
+
+    conn.execute(
+        "INSERT OR IGNORE INTO app_categories (id, name, icon, type) VALUES ('cat-imported', 'cat.imported', 'Folder', 'user')",
+        [],
+    )
+    .map_err(|error| format!("Failed to ensure imported category exists: {error}"))?;
 
     let site_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM app_sites", [], |row| row.get(0))
@@ -400,6 +408,11 @@ fn seed_default_data(conn: &Connection) -> Result<(), String> {
         [],
     )
     .map_err(|error| format!("Failed to seed view mode setting: {error}"))?;
+    conn.execute(
+        "INSERT OR IGNORE INTO app_settings (key, value) VALUES ('importCategoryId', 'cat-imported')",
+        [],
+    )
+    .map_err(|error| format!("Failed to seed import category setting: {error}"))?;
 
     Ok(())
 }
@@ -441,10 +454,25 @@ fn replace_all_data(conn: &mut Connection, data: &PersistedAppData) -> Result<()
             .map_err(|error| format!("Failed to insert imported site '{}': {error}", site.id))?;
     }
 
+    let resolved_import_category_id = if data
+        .categories
+        .iter()
+        .any(|category| category.id == data.import_category_id)
+    {
+        data.import_category_id.clone()
+    } else {
+        data.categories
+            .iter()
+            .find(|category| category.category_type == "user")
+            .map(|category| category.id.clone())
+            .unwrap_or_else(|| data.categories[0].id.clone())
+    };
+
     upsert_setting_tx(&tx, "environment", &data.environment)?;
     upsert_setting_tx(&tx, "viewMode", &data.view_mode)?;
     upsert_setting_tx(&tx, "theme", &data.theme)?;
     upsert_setting_tx(&tx, "language", &data.language)?;
+    upsert_setting_tx(&tx, "importCategoryId", &resolved_import_category_id)?;
 
     tx.commit()
         .map_err(|error| format!("Failed to commit import transaction: {error}"))?;
@@ -769,7 +797,8 @@ mod tests {
             "environment": "DEV",
             "viewMode": "list",
             "theme": "dark",
-            "language": "en"
+            "language": "en",
+            "importCategoryId": "cat-import"
           }
         })
         .to_string();
@@ -782,5 +811,6 @@ mod tests {
         assert_eq!(imported.view_mode, "list");
         assert_eq!(imported.theme, "dark");
         assert_eq!(imported.language, "en");
+        assert_eq!(imported.import_category_id, "cat-import");
     }
 }
