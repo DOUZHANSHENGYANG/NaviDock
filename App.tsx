@@ -459,7 +459,7 @@ const App: React.FC = () => {
                 <p className="font-bold text-xl text-slate-400 dark:text-slate-600">{t('app.no_services')}</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className={`grid gap-6 animate-fade-in-up ${browser ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'}`}>
+              <div className={`grid gap-6 animate-fade-in-up ${browser ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'}`}>
                 {filteredSites.map(site => (
                   <SiteCard
                     key={site.id}
@@ -524,7 +524,7 @@ const App: React.FC = () => {
           {browser && (
             <section
               ref={browserContainerRef}
-              className="w-[48%] min-w-[460px] max-w-[860px] h-full rounded-[28px] border border-white/50 dark:border-white/10 bg-white/75 dark:bg-black/45 backdrop-blur-xl shadow-[0_24px_50px_-28px_rgba(15,23,42,0.75)] overflow-hidden flex flex-col"
+              className="w-[58%] min-w-[560px] max-w-[1240px] h-full rounded-[28px] border border-white/50 dark:border-white/10 bg-white/75 dark:bg-black/45 backdrop-blur-xl shadow-[0_24px_50px_-28px_rgba(15,23,42,0.75)] overflow-hidden flex flex-col"
             >
               <div className="px-4 py-3 border-b border-white/60 dark:border-white/10 bg-gradient-to-r from-white/80 via-cyan-50/60 to-emerald-50/55 dark:from-slate-900/70 dark:via-cyan-900/20 dark:to-emerald-900/20 flex items-center gap-2">
                 <div className="flex items-center gap-2">

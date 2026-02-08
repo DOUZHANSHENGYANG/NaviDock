@@ -118,3 +118,9 @@
 - `113-round16-embedded-browser-zoom-controls.png`
 - `114-round16-embedded-browser-fit-zoom.png`
 - `115-round16-embedded-browser-zoom-in-out.png`
+
+## round17（2026-02-08）补充：内嵌浏览窗口占比加大
+- 将内嵌浏览面板宽度由 `48%` 调整为 `58%`（`min-w: 560px`, `max-w: 1240px`）。
+- 浏览面板打开时，左侧卡片网格列数同步收敛（`xl:2列 / 2xl:3列`），避免拥挤。
+- Playwright 量测结果：面板实际宽度占比约 `0.555`（> 0.52 目标）。
+- 证据截图：`116-round17-embedded-browser-wider-layout.png`。
