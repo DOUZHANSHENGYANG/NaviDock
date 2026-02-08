@@ -37,7 +37,7 @@ npm run tauri:build -- --debug --no-bundle
 ### 5) Release 打包（含安装包）
 
 ```bash
-npm run release:win
+npm run release:bundle
 ```
 
 > 该命令会生成 NSIS + MSI 安装包。
