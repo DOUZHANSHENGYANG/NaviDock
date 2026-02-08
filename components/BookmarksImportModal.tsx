@@ -1,18 +1,13 @@
-﻿import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Upload, FolderTree, FolderInput } from 'lucide-react';
 import { useNavStore } from '../context/NavContext';
 import { useToast } from '../context/ToastContext';
 import { SiteItem } from '../types';
+import { BookmarkImportItem, parseBrowserBookmarksHtml } from '../services/bookmarkHtml';
 
 interface BookmarksImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface BookmarkImportItem {
-  title: string;
-  url: string;
-  folders: string[];
 }
 
 const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onClose }) => {
@@ -56,60 +51,6 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
 
   if (!isOpen) return null;
 
-  const parseBookmarksHtml = (content: string): BookmarkImportItem[] => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(content, 'text/html');
-    const firstRoot = doc.querySelector('DL');
-    if (!firstRoot) return [];
-
-    const records: BookmarkImportItem[] = [];
-    const dedupe = new Set<string>();
-
-    const walk = (node: Element, path: string[]) => {
-      const children = Array.from(node.children);
-      for (let index = 0; index < children.length; index += 1) {
-        const child = children[index];
-        const tag = child.tagName.toUpperCase();
-
-        if (tag === 'DT') {
-          const anchor = child.querySelector(':scope > A');
-          if (anchor) {
-            const href = (anchor.getAttribute('HREF') || '').trim();
-            if (href && !dedupe.has(href)) {
-              dedupe.add(href);
-              records.push({
-                title: (anchor.textContent || href).trim(),
-                url: href,
-                folders: path,
-              });
-            }
-          }
-
-          const folder = child.querySelector(':scope > H3');
-          if (folder) {
-            const folderName = (folder.textContent || '').trim() || 'Imported';
-            const directNested = child.querySelector(':scope > DL');
-            const siblingNested = child.nextElementSibling?.tagName.toUpperCase() === 'DL'
-              ? child.nextElementSibling
-              : null;
-            const nested = directNested || siblingNested;
-            if (nested) {
-              walk(nested, [...path, folderName]);
-            }
-          }
-          continue;
-        }
-
-        if (tag === 'DL') {
-          walk(child, path);
-        }
-      }
-    };
-
-    walk(firstRoot, []);
-    return records;
-  };
-
   const openFilePicker = () => {
     fileInputRef.current?.click();
   };
@@ -120,7 +61,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
 
     try {
       const content = await file.text();
-      const parsed = parseBookmarksHtml(content);
+      const parsed = parseBrowserBookmarksHtml(content);
       setBookmarks(parsed);
       setFileName(file.name);
 
@@ -165,6 +106,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
       devUrl: '',
       prodUrl: bookmark.url,
     },
+    icon: bookmark.icon,
     categoryId,
     tags: ['Bookmark', ...bookmark.folders.slice(0, 2)],
     status: 'online',
@@ -330,7 +272,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="text/html,.html"
+                accept="text/html,.html,.htm"
                 className="hidden"
                 onChange={event => {
                   void handleFileChange(event);

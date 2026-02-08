@@ -15,6 +15,8 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, currentEnv, onEdit, onOpen })
   const { deleteSite, language } = useNavStore();
   const { showToast } = useToast();
   const [isDeleteArmed, setIsDeleteArmed] = useState(false);
+  const [iconLoadFailed, setIconLoadFailed] = useState(false);
+  const [iconTryFallback, setIconTryFallback] = useState(false);
 
   useEffect(() => {
     if (!isDeleteArmed) return;
@@ -26,6 +28,11 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, currentEnv, onEdit, onOpen })
   const activeUrl = isSystemDev
     ? (currentEnv === 'DEV' ? site.envConfig.devUrl : site.envConfig.prodUrl)
     : site.envConfig.prodUrl;
+
+  useEffect(() => {
+    setIconLoadFailed(false);
+    setIconTryFallback(false);
+  }, [site.icon, site.envConfig.prodUrl, site.envConfig.devUrl, currentEnv]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -77,6 +84,30 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, currentEnv, onEdit, onOpen })
     if (lowerTitle.includes('aws') || lowerTitle.includes('cloud')) return <Cloud size={size} />;
     if (lowerTitle.includes('jenkins') || lowerTitle.includes('ci')) return <Server size={size} />;
     return <Globe size={size} />;
+  };
+
+  const resolveFaviconByUrl = (url: string) => {
+    try {
+      const { hostname } = new URL(url);
+      if (!hostname) return '';
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64`;
+    } catch {
+      return '';
+    }
+  };
+
+  const storedIcon = site.icon?.trim() || '';
+  const fallbackIconByUrl = resolveFaviconByUrl(activeUrl || site.envConfig.prodUrl || site.envConfig.devUrl || '');
+  const iconSrc = iconLoadFailed
+    ? ''
+    : (iconTryFallback ? fallbackIconByUrl : (storedIcon || fallbackIconByUrl));
+
+  const handleIconLoadError = () => {
+    if (!iconTryFallback && storedIcon && fallbackIconByUrl && storedIcon !== fallbackIconByUrl) {
+      setIconTryFallback(true);
+      return;
+    }
+    setIconLoadFailed(true);
   };
 
   const handleDelete = async (event: React.MouseEvent) => {
@@ -135,7 +166,18 @@ const SiteCard: React.FC<SiteCardProps> = ({ site, currentEnv, onEdit, onOpen })
 
       <div className="relative flex justify-between items-start mb-4">
         <div className={`w-12 h-12 rounded-xl border ${theme.icon} backdrop-blur-md flex items-center justify-center transition-transform duration-500 group-hover:rotate-6 group-hover:scale-105 shadow-sm`}>
-          <div className="opacity-95">{renderIcon()}</div>
+          {iconSrc ? (
+            <img
+              src={iconSrc}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={handleIconLoadError}
+              className="w-6 h-6 rounded object-contain opacity-95"
+            />
+          ) : (
+            <div className="opacity-95">{renderIcon()}</div>
+          )}
         </div>
 
         <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-[-4px] group-hover:translate-y-0">
