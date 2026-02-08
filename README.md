@@ -8,6 +8,23 @@
 
 ## 快速开始
 
+### 一键启动（Windows）
+
+```powershell
+.\start-navidock.ps1
+```
+
+或直接双击：
+
+```text
+start-navidock.bat
+```
+
+脚本会自动：
+- 清理占用 `9101` 端口的旧进程
+- 检查依赖并在缺失时执行 `npm install`
+- 启动 `npm run tauri:dev`
+
 ### 1) 安装依赖
 
 ```bash
