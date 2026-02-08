@@ -194,7 +194,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
         <div className="px-8 py-5 border-b border-white/40 dark:border-white/10 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('settings.category_mgmt')}</h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
               {language === 'zh' ? '集中管理分类、重命名、删除与默认导入分类。' : 'Centralized category create, rename, delete and default import category.'}
             </p>
           </div>
@@ -223,7 +223,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-300">
                 {t('settings.default_import_category')}
               </p>
               <div ref={importMenuRef} className="relative">
@@ -264,7 +264,7 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
                 )}
               </div>
             </div>
-            <div className="text-xs text-slate-400 flex items-end">
+            <div className="flex items-end text-xs text-slate-500 dark:text-slate-300">
               {language === 'zh'
                 ? '导入书签时会默认使用此分类，也可在导入弹窗中临时切换。'
                 : 'Bookmark import uses this category by default, and can still be changed in import modal.'}
@@ -277,6 +277,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
               const isEditing = editingCategory?.id === category.id;
               const isSystem = category.type === 'system';
               const isDeleteArmed = pendingDeleteId === category.id;
+              const badgeBaseClass =
+                'inline-flex min-h-[22px] items-center rounded-full px-2.5 py-1 text-[13px] font-extrabold leading-none tracking-[0.02em] shadow-sm';
+              const typeBadgeClass = isSystem
+                ? 'bg-indigo-200 text-indigo-900 ring-1 ring-indigo-300/70 dark:bg-indigo-500/80 dark:text-indigo-50 dark:ring-indigo-200/70'
+                : 'bg-emerald-200 text-emerald-900 ring-1 ring-emerald-300/70 dark:bg-emerald-500/80 dark:text-emerald-50 dark:ring-emerald-200/70';
 
               return (
                 <div key={category.id} className="glass-card rounded-2xl p-4 border border-white/30 dark:border-white/10">
@@ -284,21 +289,21 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{t(category.name)}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSystem ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                        <span className={`${badgeBaseClass} ${typeBadgeClass}`}>
                           {isSystem ? 'SYSTEM' : 'USER'}
                         </span>
                         {importCategoryId === category.id && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand-DEFAULT">
+                          <span className={`${badgeBaseClass} bg-teal-200 text-teal-900 ring-1 ring-teal-300/70 dark:bg-teal-500/80 dark:text-teal-50 dark:ring-teal-200/70`}>
                             {language === 'zh' ? '默认导入' : 'Default Import'}
                           </span>
                         )}
                         {isDeleteArmed && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/35 dark:text-red-300">
+                          <span className={`${badgeBaseClass} bg-red-200 text-red-900 ring-1 ring-red-300/70 dark:bg-red-500/80 dark:text-red-50 dark:ring-red-200/70`}>
                             {language === 'zh' ? '再次点击删除' : 'Click again to delete'}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-400">{language === 'zh' ? `${count} 个网址` : `${count} sites`}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300">{language === 'zh' ? `${count} 个网址` : `${count} sites`}</p>
                     </div>
 
                     {!isSystem && (

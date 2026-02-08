@@ -40,9 +40,18 @@ const App: React.FC = () => {
   } | null>(null);
   const [browserAddress, setBrowserAddress] = useState('');
   const [browserZoom, setBrowserZoom] = useState(1);
+  const [browserHistory, setBrowserHistory] = useState<{
+    stack: string[];
+    index: number;
+  }>({
+    stack: [],
+    index: -1,
+  });
   const browserFrameRef = useRef<HTMLIFrameElement | null>(null);
   const browserContainerRef = useRef<HTMLDivElement | null>(null);
   const browserViewportRef = useRef<HTMLDivElement | null>(null);
+  const browserActionButtonClass =
+    'p-2 rounded-xl border border-white/55 dark:border-white/15 bg-white/70 dark:bg-black/35 text-slate-600 dark:text-slate-200 hover:bg-white dark:hover:bg-white/10 hover:text-brand-DEFAULT disabled:opacity-45 disabled:cursor-not-allowed transition-all shadow-sm';
 
   const handleEditSite = (site: SiteItem) => {
     setEditingSite(site);
@@ -67,6 +76,35 @@ const App: React.FC = () => {
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
     return `https://${trimmed}`;
   };
+
+  const deriveBrowserTitle = (url: string, fallback = 'Embedded Browser') => {
+    try {
+      return new URL(url).host || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const pushBrowserHistory = (rawUrl: string) => {
+    const normalizedUrl = normalizeBrowserUrl(rawUrl);
+    if (!normalizedUrl) return;
+
+    setBrowserHistory(prev => {
+      const current = prev.stack[prev.index];
+      if (current === normalizedUrl) return prev;
+
+      const nextStack = prev.stack.slice(0, prev.index + 1);
+      nextStack.push(normalizedUrl);
+      return {
+        stack: nextStack,
+        index: nextStack.length - 1,
+      };
+    });
+  };
+
+  const canBrowserGoBack = browserHistory.index > 0;
+  const canBrowserGoForward =
+    browserHistory.index >= 0 && browserHistory.index < browserHistory.stack.length - 1;
 
   const clampZoom = (value: number) => {
     const bounded = Math.min(1.6, Math.max(0.45, value));
@@ -127,6 +165,7 @@ const App: React.FC = () => {
           : prev,
       );
       setBrowserAddress(currentUrl);
+      pushBrowserHistory(currentUrl);
     } catch {
       // Cross-origin pages may block location/title introspection; keep current state.
     }
@@ -142,29 +181,25 @@ const App: React.FC = () => {
       });
       return;
     }
+    if (!browser) return;
 
     setBrowser(prev => {
       if (!prev) return prev;
-      let nextTitle = prev.title;
-      try {
-        nextTitle = new URL(nextUrl).host || prev.title;
-      } catch {
-        nextTitle = prev.title;
-      }
 
       return {
         ...prev,
         url: nextUrl,
-        title: nextTitle,
-        reloadKey: Date.now(),
+        title: deriveBrowserTitle(nextUrl, prev.title),
       };
     });
     setBrowserAddress(nextUrl);
     setBrowserZoom(1);
+    pushBrowserHistory(nextUrl);
   };
 
   const openSite = async (site: SiteItem) => {
-    const url = resolveSiteUrl(site)?.trim();
+    const rawUrl = resolveSiteUrl(site)?.trim();
+    const url = normalizeBrowserUrl(rawUrl || '');
 
     if (!url) {
       handleEditSite(site);
@@ -173,40 +208,78 @@ const App: React.FC = () => {
 
     setBrowser({
       url,
-      title: site.title || 'Embedded Browser',
+      title: site.title || deriveBrowserTitle(url),
       isFullscreen: false,
       reloadKey: Date.now(),
     });
     setBrowserAddress(url);
     setBrowserZoom(1);
+    setBrowserHistory({
+      stack: [url],
+      index: 0,
+    });
   };
 
   const handleBrowserBack = () => {
-    try {
-      browserFrameRef.current?.contentWindow?.history.back();
-      window.setTimeout(syncBrowserLocation, 250);
-    } catch (error) {
-      console.warn('[App] Browser back action failed.', error);
+    if (!canBrowserGoBack) {
       showToast({
         variant: 'warning',
         title: language === 'zh' ? '无法返回' : 'Cannot Go Back',
-        message: language === 'zh' ? '当前页面不支持返回。' : 'Current page does not support back navigation.',
+        message:
+          language === 'zh'
+            ? '当前会话中没有上一页。'
+            : 'No previous page is available in current session.',
       });
+      return;
     }
+
+    const targetIndex = browserHistory.index - 1;
+    const targetUrl = browserHistory.stack[targetIndex];
+    if (!targetUrl) return;
+
+    setBrowser(prev =>
+      prev
+        ? {
+            ...prev,
+            url: targetUrl,
+            title: deriveBrowserTitle(targetUrl, prev.title),
+          }
+        : prev,
+    );
+    setBrowserAddress(targetUrl);
+    setBrowserZoom(1);
+    setBrowserHistory(prev => ({ ...prev, index: targetIndex }));
   };
 
   const handleBrowserForward = () => {
-    try {
-      browserFrameRef.current?.contentWindow?.history.forward();
-      window.setTimeout(syncBrowserLocation, 250);
-    } catch (error) {
-      console.warn('[App] Browser forward action failed.', error);
+    if (!canBrowserGoForward) {
       showToast({
         variant: 'warning',
         title: language === 'zh' ? '无法前进' : 'Cannot Go Forward',
-        message: language === 'zh' ? '当前页面不支持前进。' : 'Current page does not support forward navigation.',
+        message:
+          language === 'zh'
+            ? '当前会话中没有下一页。'
+            : 'No forward page is available in current session.',
       });
+      return;
     }
+
+    const targetIndex = browserHistory.index + 1;
+    const targetUrl = browserHistory.stack[targetIndex];
+    if (!targetUrl) return;
+
+    setBrowser(prev =>
+      prev
+        ? {
+            ...prev,
+            url: targetUrl,
+            title: deriveBrowserTitle(targetUrl, prev.title),
+          }
+        : prev,
+    );
+    setBrowserAddress(targetUrl);
+    setBrowserZoom(1);
+    setBrowserHistory(prev => ({ ...prev, index: targetIndex }));
   };
 
   const handleBrowserRefresh = () => {
@@ -221,6 +294,10 @@ const App: React.FC = () => {
     setBrowser(null);
     setBrowserAddress('');
     setBrowserZoom(1);
+    setBrowserHistory({
+      stack: [],
+      index: -1,
+    });
   };
 
   const handleBrowserOpenExternal = async () => {
@@ -279,6 +356,39 @@ const App: React.FC = () => {
     }, 180);
     return () => window.clearTimeout(timer);
   }, [browser?.url, browser?.reloadKey]);
+
+  useEffect(() => {
+    if (!browser) return;
+
+    const onKeydown = (event: KeyboardEvent) => {
+      const isShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x';
+      if (!isShortcut) return;
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable =
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        Boolean(target?.isContentEditable);
+
+      if (isEditable) return;
+
+      event.preventDefault();
+      handleBrowserFitZoom();
+      showToast({
+        variant: 'info',
+        title: language === 'zh' ? '已自动适配' : 'Auto Fit Applied',
+        message:
+          language === 'zh'
+            ? '已按内嵌面板宽度自动缩放。'
+            : 'Embedded page zoom was fit to panel width.',
+        durationMs: 1600,
+      });
+    };
+
+    document.addEventListener('keydown', onKeydown);
+    return () => document.removeEventListener('keydown', onKeydown);
+  }, [browser, language, showToast]);
 
   // Handle click on list item: Click to open, Ctrl/Cmd + Click to edit
   const handleListRowClick = (e: React.MouseEvent, site: SiteItem) => {
@@ -526,15 +636,37 @@ const App: React.FC = () => {
               ref={browserContainerRef}
               className="w-[58%] min-w-[560px] max-w-[1240px] h-full rounded-[28px] border border-white/50 dark:border-white/10 bg-white/75 dark:bg-black/45 backdrop-blur-xl shadow-[0_24px_50px_-28px_rgba(15,23,42,0.75)] overflow-hidden flex flex-col"
             >
-              <div className="px-4 py-3 border-b border-white/60 dark:border-white/10 bg-gradient-to-r from-white/80 via-cyan-50/60 to-emerald-50/55 dark:from-slate-900/70 dark:via-cyan-900/20 dark:to-emerald-900/20 flex items-center gap-2">
+              <div className="px-4 py-3 border-b border-white/60 dark:border-white/10 bg-gradient-to-r from-indigo-50/80 via-cyan-50/80 to-emerald-50/80 dark:from-slate-950/85 dark:via-cyan-950/45 dark:to-emerald-950/45 flex items-center gap-2">
                 <div className="flex items-center gap-2">
-                  <button onClick={handleBrowserBack} className="p-2 rounded-lg hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300">
+                  <button
+                    onClick={handleBrowserBack}
+                    disabled={!canBrowserGoBack}
+                    className={browserActionButtonClass}
+                    title={
+                      canBrowserGoBack
+                        ? (language === 'zh' ? '返回' : 'Back')
+                        : (language === 'zh' ? '当前会话没有上一页' : 'No previous page in this session')
+                    }
+                  >
                     <ArrowLeft size={16} />
                   </button>
-                  <button onClick={handleBrowserForward} className="p-2 rounded-lg hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300">
+                  <button
+                    onClick={handleBrowserForward}
+                    disabled={!canBrowserGoForward}
+                    className={browserActionButtonClass}
+                    title={
+                      canBrowserGoForward
+                        ? (language === 'zh' ? '前进' : 'Forward')
+                        : (language === 'zh' ? '当前会话没有下一页' : 'No forward page in this session')
+                    }
+                  >
                     <ArrowRight size={16} />
                   </button>
-                  <button onClick={handleBrowserRefresh} className="p-2 rounded-lg hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300">
+                  <button
+                    onClick={handleBrowserRefresh}
+                    className={browserActionButtonClass}
+                    title={language === 'zh' ? '刷新' : 'Refresh'}
+                  >
                     <RefreshCw size={16} />
                   </button>
                 </div>
@@ -559,7 +691,7 @@ const App: React.FC = () => {
                     />
                     <button
                       onClick={() => navigateEmbeddedUrl(browserAddress)}
-                      className="px-2.5 py-1.5 rounded-lg bg-brand-light dark:bg-brand-DEFAULT/20 text-brand-DEFAULT dark:text-emerald-200 text-[11px] font-black hover:brightness-105 transition-all"
+                      className="px-2.5 py-1.5 rounded-xl border border-emerald-200/70 dark:border-emerald-500/35 bg-gradient-to-r from-emerald-100/80 to-cyan-100/80 dark:from-emerald-500/20 dark:to-cyan-500/20 text-emerald-700 dark:text-emerald-200 text-[11px] font-black hover:brightness-110 transition-all shadow-sm"
                     >
                       {language === 'zh' ? '前往' : 'Go'}
                     </button>
@@ -567,54 +699,57 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="hidden md:flex items-center gap-1 px-1.5 py-1 rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-black/30">
+                  <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-xl border border-white/60 dark:border-white/15 bg-white/65 dark:bg-black/35 shadow-sm">
                     <button
                       onClick={handleBrowserZoomOut}
-                      className="p-1.5 rounded hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300"
+                      className={browserActionButtonClass}
                       title={language === 'zh' ? '缩小' : 'Zoom out'}
                     >
                       <ZoomOut size={14} />
                     </button>
                     <button
                       onClick={handleBrowserFitZoom}
-                      className="px-2 py-1 rounded text-[10px] font-black tracking-wide text-brand-DEFAULT bg-brand-light/70 dark:bg-brand-DEFAULT/20"
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wide text-emerald-700 dark:text-emerald-200 bg-gradient-to-r from-emerald-100/80 to-cyan-100/80 dark:from-emerald-500/25 dark:to-cyan-500/25 border border-emerald-200/70 dark:border-emerald-500/30"
                       title={language === 'zh' ? '适配宽度' : 'Fit width'}
                     >
                       {language === 'zh' ? '适配' : 'FIT'}
                     </button>
                     <button
                       onClick={handleBrowserZoomReset}
-                      className="px-2 py-1 rounded text-[10px] font-black tracking-wide text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-white/10"
+                      className="px-2 py-1 rounded-lg text-[10px] font-black tracking-wide text-slate-700 dark:text-slate-200 bg-white/75 dark:bg-black/35 border border-white/60 dark:border-white/15 hover:bg-white dark:hover:bg-white/10 transition-colors"
                       title={language === 'zh' ? '重置缩放' : 'Reset zoom'}
                     >
                       {Math.round(browserZoom * 100)}%
                     </button>
                     <button
                       onClick={handleBrowserZoomIn}
-                      className="p-1.5 rounded hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300"
+                      className={browserActionButtonClass}
                       title={language === 'zh' ? '放大' : 'Zoom in'}
                     >
                       <ZoomIn size={14} />
                     </button>
+                    <kbd className="px-2 py-1 rounded-lg text-[10px] font-black tracking-wide text-slate-500 dark:text-slate-300 bg-white/70 dark:bg-black/35 border border-white/55 dark:border-white/15">
+                      Ctrl+X
+                    </kbd>
                   </div>
 
                   <button
                     onClick={() => { void handleBrowserOpenExternal(); }}
-                    className="p-2 rounded-lg hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300"
+                    className={browserActionButtonClass}
                     title={language === 'zh' ? '外部浏览器打开' : 'Open externally'}
                   >
                     <ExternalLink size={16} />
                   </button>
                   <button
                     onClick={() => { void handleBrowserFullscreen(); }}
-                    className="p-2 rounded-lg hover:bg-white/70 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300"
+                    className={browserActionButtonClass}
                     title={browser.isFullscreen ? (language === 'zh' ? '退出全屏' : 'Exit fullscreen') : (language === 'zh' ? '全屏' : 'Fullscreen')}
                   >
                     {browser.isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                   </button>
                   <button
                     onClick={() => { void handleBrowserClose(); }}
-                    className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-500 dark:text-slate-300"
+                    className="p-2 rounded-xl border border-white/55 dark:border-white/15 bg-white/70 dark:bg-black/35 text-slate-500 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 transition-all shadow-sm"
                     title={language === 'zh' ? '关闭内嵌浏览器' : 'Close embedded browser'}
                   >
                     <X size={16} />

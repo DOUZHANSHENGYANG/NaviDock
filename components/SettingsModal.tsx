@@ -1,9 +1,10 @@
-﻿import React, { ChangeEvent, useRef, useState } from 'react';
-import { X, Moon, Sun, Download, Upload, Monitor, BookmarkPlus } from 'lucide-react';
+import React, { ChangeEvent, useRef, useState } from 'react';
+import { X, Moon, Sun, Download, Upload, Monitor, BookmarkPlus, Bookmark } from 'lucide-react';
 import { useNavStore } from '../context/NavContext';
 import { Theme } from '../types';
 import BookmarksImportModal from './BookmarksImportModal';
 import { useToast } from '../context/ToastContext';
+import { buildBrowserBookmarksHtml } from '../services/bookmarkHtml';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     setTheme,
     language,
     setLanguage,
+    sites,
+    categories,
     exportConfig,
     importConfigFromText,
     isDesktopPersistenceEnabled,
@@ -25,6 +28,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isExportingBookmarks, setIsExportingBookmarks] = useState(false);
   const [isBookmarksImportOpen, setIsBookmarksImportOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -55,6 +59,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const downloadTextFile = (filename: string, content: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const buildBookmarksExportFilename = () => {
+    const formatted = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    return `navidock-bookmarks-${formatted}.html`;
+  };
+
+  const handleBookmarksExport = async () => {
+    try {
+      setIsExportingBookmarks(true);
+      const html = buildBrowserBookmarksHtml(sites, categories, {
+        rootFolderName: language === 'zh' ? 'NaviDock \u4e66\u7b7e' : 'NaviDock Bookmarks',
+        resolveCategoryName: category => t(category.name),
+      });
+
+      downloadTextFile(buildBookmarksExportFilename(), html, 'text/html;charset=utf-8');
+      showToast({
+        variant: 'success',
+        title: language === 'zh' ? '\u4e66\u7b7e\u5bfc\u51fa\u5b8c\u6210' : 'Bookmarks Exported',
+        message:
+          language === 'zh'
+            ? '\u5df2\u5bfc\u51fa\u4e3a Chrome/Netscape \u517c\u5bb9\u7684 HTML \u4e66\u7b7e\u6587\u4ef6\u3002'
+            : 'Exported as a Chrome/Netscape-compatible bookmark HTML file.',
+      });
+    } catch (error) {
+      console.error('[SettingsModal] Bookmark export failed.', error);
+      showToast({
+        variant: 'error',
+        title: language === 'zh' ? '\u4e66\u7b7e\u5bfc\u51fa\u5931\u8d25' : 'Bookmark Export Failed',
+        message: language === 'zh' ? '\u8bf7\u67e5\u770b\u63a7\u5236\u53f0\u65e5\u5fd7\u3002' : 'Please check console logs.',
+      });
+    } finally {
+      setIsExportingBookmarks(false);
     }
   };
 
@@ -167,7 +215,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   onClick={() => {
                     void handleExport();
                   }}
-                  disabled={isExporting || isImporting}
+                  disabled={isExporting || isImporting || isExportingBookmarks}
                   className="w-full flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed border border-white/40 dark:border-white/10 rounded-xl transition-all text-slate-700 dark:text-gray-200 font-semibold text-sm group backdrop-blur-sm"
                 >
                   <span className="flex items-center gap-3">
@@ -177,8 +225,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </button>
 
                 <button
+                  onClick={() => {
+                    void handleBookmarksExport();
+                  }}
+                  disabled={isExporting || isImporting || isExportingBookmarks}
+                  className="w-full flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed border border-white/40 dark:border-white/10 rounded-xl transition-all text-slate-700 dark:text-gray-200 font-semibold text-sm group backdrop-blur-sm"
+                >
+                  <span className="flex items-center gap-3">
+                    <Bookmark size={18} className="text-amber-500" />
+                    {isExportingBookmarks
+                      ? (language === 'zh' ? '\u5bfc\u51fa\u4e66\u7b7e\u4e2d...' : 'Exporting bookmarks...')
+                      : (language === 'zh' ? '\u5bfc\u51fa\u4e66\u7b7e\uff08HTML\uff09' : 'Export Bookmarks (HTML)')}
+                  </span>
+                </button>
+
+                <button
                   onClick={handleOpenImport}
-                  disabled={isExporting || isImporting}
+                  disabled={isExporting || isImporting || isExportingBookmarks}
                   className="w-full flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed border border-white/40 dark:border-white/10 rounded-xl transition-all text-slate-700 dark:text-gray-200 font-semibold text-sm group backdrop-blur-sm"
                 >
                   <span className="flex items-center gap-3">
@@ -189,7 +252,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 <button
                   onClick={() => setIsBookmarksImportOpen(true)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 border border-white/40 dark:border-white/10 rounded-xl transition-all text-slate-700 dark:text-gray-200 font-semibold text-sm group backdrop-blur-sm"
+                  disabled={isExporting || isImporting || isExportingBookmarks}
+                  className="w-full flex items-center justify-between px-5 py-3.5 bg-white/40 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10 disabled:opacity-60 disabled:cursor-not-allowed border border-white/40 dark:border-white/10 rounded-xl transition-all text-slate-700 dark:text-gray-200 font-semibold text-sm group backdrop-blur-sm"
                 >
                   <span className="flex items-center gap-3">
                     <BookmarkPlus size={18} className="text-orange-500" />
