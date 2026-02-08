@@ -300,7 +300,7 @@ function navReducer(state: NavState, action: Action): NavState {
     case 'SET_SEARCH':
       return { ...state, searchQuery: action.payload };
     case 'SET_CATEGORY':
-      return { ...state, selectedCategoryId: action.payload };
+      return { ...state, selectedCategoryId: action.payload, selectedTags: [] };
     case 'TOGGLE_TAG':
       const isSelected = state.selectedTags.includes(action.payload);
       return {
@@ -385,10 +385,16 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- Getters ---
 
   const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    state.sites.forEach(site => site.tags.forEach(tag => tags.add(tag)));
-    return Array.from(tags).sort();
-  }, [state.sites]);
+    const collectTags = (sites: SiteItem[]) => {
+      const tags = new Set<string>();
+      sites.forEach(site => site.tags.forEach(tag => tags.add(tag)));
+      return Array.from(tags).sort();
+    };
+
+    if (!state.selectedCategoryId) return collectTags(state.sites);
+    const categorySites = state.sites.filter(site => site.categoryId === state.selectedCategoryId);
+    return collectTags(categorySites);
+  }, [state.sites, state.selectedCategoryId]);
 
   const filteredSites = useMemo(() => {
     return state.sites.filter(site => {
@@ -603,19 +609,24 @@ export const NavProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const exportConfig = async () => {
-    const configJson = desktopApi.isEnabled
-      ? await desktopApi.exportConfig()
-      : JSON.stringify(
-          {
-            formatVersion: '1.0.0',
-            exportedAt: new Date().toISOString(),
-            data: toPersistedStateSnapshot(),
-          },
-          null,
-          2,
-        );
+    const filename = buildExportFilename();
 
-    downloadJson(buildExportFilename(), configJson);
+    if (desktopApi.isEnabled) {
+      await desktopApi.exportConfigToFile(filename);
+      return;
+    }
+
+    const configJson = JSON.stringify(
+      {
+        formatVersion: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        data: toPersistedStateSnapshot(),
+      },
+      null,
+      2,
+    );
+
+    downloadJson(filename, configJson);
   };
 
   const importConfigFromText = async (configText: string) => {

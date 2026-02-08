@@ -3,6 +3,11 @@ import { Category, PersistedAppData, SiteItem } from '../types';
 
 export type AppSettingKey = 'theme' | 'language' | 'environment' | 'viewMode' | 'importCategoryId';
 
+export interface UrlMetadata {
+  title?: string | null;
+  description?: string | null;
+}
+
 const hasTauriRuntime = () =>
   typeof window !== 'undefined' &&
   ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
@@ -37,6 +42,17 @@ export const desktopApi = {
     callCommand<void>('update_setting', { key, value }),
 
   exportConfig: (): Promise<string> => callCommand<string>('export_config'),
+
+  exportConfigToFile: (suggestedFilename?: string): Promise<string | null> =>
+    callCommand<string | null>('export_config_to_file', { suggestedFilename }),
+
+  openUrl: (url: string): Promise<void> => callCommand<void>('open_url', { url }),
+
+  openSiteWindow: (url: string, title?: string): Promise<void> =>
+    callCommand<void>('open_site_window', { url, title }),
+
+  fetchUrlMetadata: (url: string): Promise<UrlMetadata> =>
+    callCommand<UrlMetadata>('fetch_url_metadata', { url }),
 
   importConfig: (configJson: string): Promise<PersistedAppData> =>
     callCommand<PersistedAppData>('import_config', { configJson }),

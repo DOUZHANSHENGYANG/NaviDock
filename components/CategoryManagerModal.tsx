@@ -1,7 +1,8 @@
-﻿import React, { useMemo, useState } from 'react';
-import { X, Plus, Pencil, Trash2, Save } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, Plus, Pencil, Trash2, Save, ChevronDown } from 'lucide-react';
 import { useNavStore } from '../context/NavContext';
 import { Category } from '../types';
+import { useToast } from '../context/ToastContext';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -20,11 +21,50 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
     language,
     t,
   } = useNavStore();
+  const { showToast } = useToast();
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingName, setEditingName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const deleteTimerRef = useRef<number | null>(null);
+  const importMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPendingDeleteId(null);
+      setEditingCategory(null);
+      setEditingName('');
+      setIsImportMenuOpen(false);
+      if (deleteTimerRef.current) {
+        window.clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (deleteTimerRef.current) {
+        window.clearTimeout(deleteTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isImportMenuOpen) return;
+
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!importMenuRef.current) return;
+      if (importMenuRef.current.contains(event.target as Node)) return;
+      setIsImportMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', onDocumentClick);
+    return () => document.removeEventListener('mousedown', onDocumentClick);
+  }, [isImportMenuOpen]);
 
   const categorySiteCount = useMemo(() => {
     const counter = new Map<string, number>();
@@ -35,6 +75,14 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
   }, [sites]);
 
   if (!isOpen) return null;
+
+  const clearDeleteArm = () => {
+    if (deleteTimerRef.current) {
+      window.clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    setPendingDeleteId(null);
+  };
 
   const beginEdit = (category: Category) => {
     setEditingCategory(category);
@@ -49,6 +97,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
       setIsSaving(true);
       await addCategory(value);
       setNewCategoryName('');
+      showToast({
+        variant: 'success',
+        title: language === 'zh' ? '已新增分类' : 'Category Added',
+        message: language === 'zh' ? '分类创建成功。' : 'Category has been created.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -64,6 +117,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
       await updateCategory(editingCategory.id, value);
       setEditingCategory(null);
       setEditingName('');
+      showToast({
+        variant: 'success',
+        title: language === 'zh' ? '已保存' : 'Saved',
+        message: language === 'zh' ? '分类名称更新成功。' : 'Category name updated successfully.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -71,28 +129,63 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
 
   const submitDelete = async (category: Category) => {
     const count = categorySiteCount.get(category.id) || 0;
-    const confirmed = count > 0
-      ? window.confirm(t('confirm.delete_cat_items', { count }))
-      : window.confirm(t('confirm.delete_cat_empty'));
 
-    if (!confirmed) return;
+    if (pendingDeleteId !== category.id) {
+      setPendingDeleteId(category.id);
+      if (deleteTimerRef.current) {
+        window.clearTimeout(deleteTimerRef.current);
+      }
+      deleteTimerRef.current = window.setTimeout(() => {
+        setPendingDeleteId(null);
+        deleteTimerRef.current = null;
+      }, 2600);
+
+      showToast({
+        variant: 'warning',
+        title: language === 'zh' ? '再次点击确认删除' : 'Click Again to Confirm',
+        message:
+          language === 'zh'
+            ? `将删除分类「${t(category.name)}」${count > 0 ? `及其 ${count} 条站点` : ''}。`
+            : `Category "${t(category.name)}"${count > 0 ? ` and ${count} linked sites` : ''} will be deleted.`,
+        durationMs: 2600,
+      });
+      return;
+    }
+
+    clearDeleteArm();
 
     try {
       setIsSaving(true);
       await deleteCategory(category.id);
+      showToast({
+        variant: 'success',
+        title: language === 'zh' ? '分类已删除' : 'Category Deleted',
+        message: language === 'zh' ? '分类删除成功。' : 'Category deleted successfully.',
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const updateImportCategory = async (categoryId: string) => {
+    setIsImportMenuOpen(false);
     try {
       setIsSaving(true);
       await setImportCategory(categoryId);
+      showToast({
+        variant: 'info',
+        title: language === 'zh' ? '默认导入已更新' : 'Default Import Updated',
+        message:
+          language === 'zh'
+            ? '新的导入分类已生效。'
+            : 'New default import category is now active.',
+      });
     } finally {
       setIsSaving(false);
     }
   };
+
+  const selectedImportCategory = categories.find(category => category.id === importCategoryId) || categories[0];
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -133,17 +226,43 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
               <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
                 {t('settings.default_import_category')}
               </p>
-              <select
-                value={importCategoryId}
-                onChange={event => { void updateImportCategory(event.target.value); }}
-                className="w-full bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-DEFAULT/20"
-              >
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {t(category.name)}
-                  </option>
-                ))}
-              </select>
+              <div ref={importMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsImportMenuOpen(prev => !prev)}
+                  className="w-full rounded-xl bg-gradient-to-r from-white/90 to-cyan-50/85 dark:from-black/35 dark:to-cyan-950/20 border border-cyan-200/70 dark:border-white/10 px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-100 flex items-center justify-between shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-DEFAULT/20"
+                >
+                  <span className="truncate">{selectedImportCategory ? t(selectedImportCategory.name) : '-'}</span>
+                  <ChevronDown size={16} className={`transition-transform ${isImportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isImportMenuOpen && (
+                  <div className="absolute z-[140] mt-2 w-full max-h-64 overflow-y-auto custom-scrollbar rounded-xl border border-white/70 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-2xl">
+                    {categories.map(category => {
+                      const active = category.id === importCategoryId;
+                      return (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => { void updateImportCategory(category.id); }}
+                          className={`w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors flex items-center justify-between ${
+                            active
+                              ? 'bg-gradient-to-r from-brand-DEFAULT/20 to-emerald-500/20 text-brand-DEFAULT dark:text-emerald-200'
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-white/10'
+                          }`}
+                        >
+                          <span className="truncate">{t(category.name)}</span>
+                          {active ? (
+                            <span className="text-[10px] font-black tracking-wider uppercase">
+                              {language === 'zh' ? '当前' : 'Current'}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="text-xs text-slate-400 flex items-end">
               {language === 'zh'
@@ -157,12 +276,13 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
               const count = categorySiteCount.get(category.id) || 0;
               const isEditing = editingCategory?.id === category.id;
               const isSystem = category.type === 'system';
+              const isDeleteArmed = pendingDeleteId === category.id;
 
               return (
                 <div key={category.id} className="glass-card rounded-2xl p-4 border border-white/30 dark:border-white/10">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-bold text-sm text-slate-800 dark:text-slate-100">{t(category.name)}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSystem ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
                           {isSystem ? 'SYSTEM' : 'USER'}
@@ -170,6 +290,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
                         {importCategoryId === category.id && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-light text-brand-DEFAULT">
                             {language === 'zh' ? '默认导入' : 'Default Import'}
+                          </span>
+                        )}
+                        {isDeleteArmed && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/35 dark:text-red-300">
+                            {language === 'zh' ? '再次点击删除' : 'Click again to delete'}
                           </span>
                         )}
                       </div>
@@ -186,7 +311,11 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({ isOpen, onC
                         </button>
                         <button
                           onClick={() => { void submitDelete(category); }}
-                          className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"
+                          className={`p-2 rounded-lg transition-colors ${
+                            isDeleteArmed
+                              ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
+                              : 'hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500'
+                          }`}
                         >
                           <Trash2 size={14} />
                         </button>

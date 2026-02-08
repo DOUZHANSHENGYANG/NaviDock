@@ -1,6 +1,7 @@
-import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Upload, FolderTree, FolderInput } from 'lucide-react';
 import { useNavStore } from '../context/NavContext';
+import { useToast } from '../context/ToastContext';
 import { SiteItem } from '../types';
 
 interface BookmarksImportModalProps {
@@ -25,6 +26,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
     language,
     t,
   } = useNavStore();
+  const { showToast } = useToast();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarkImportItem[]>([]);
@@ -121,12 +123,24 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
       const parsed = parseBookmarksHtml(content);
       setBookmarks(parsed);
       setFileName(file.name);
+
       if (parsed.length === 0) {
-        window.alert(language === 'zh' ? '未解析到有效书签，请确认导出的 HTML 文件格式。' : 'No bookmarks found. Please verify your exported HTML file.');
+        showToast({
+          variant: 'warning',
+          title: language === 'zh' ? '未解析到书签' : 'No Bookmarks Found',
+          message:
+            language === 'zh'
+              ? '请确认导出的 HTML 文件格式是否正确。'
+              : 'Please verify your exported HTML format.',
+        });
       }
     } catch (error) {
       console.error('[BookmarksImportModal] Failed to parse bookmarks.', error);
-      window.alert(language === 'zh' ? '解析书签文件失败。' : 'Failed to parse bookmark file.');
+      showToast({
+        variant: 'error',
+        title: language === 'zh' ? '解析失败' : 'Parse Failed',
+        message: language === 'zh' ? '书签文件解析失败。' : 'Failed to parse bookmark file.',
+      });
     } finally {
       event.target.value = '';
     }
@@ -172,10 +186,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
       const parsed = new URL(trimmed);
       parsed.hash = '';
 
-      if (
-        (parsed.protocol === 'https:' && parsed.port === '443') ||
-        (parsed.protocol === 'http:' && parsed.port === '80')
-      ) {
+      if ((parsed.protocol === 'https:' && parsed.port === '443') || (parsed.protocol === 'http:' && parsed.port === '80')) {
         parsed.port = '';
       }
 
@@ -200,12 +211,8 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
   };
 
   const resolveSingleTargetCategoryId = () => {
-    if (categories.some(category => category.id === targetCategoryId)) {
-      return targetCategoryId;
-    }
-    if (categories.some(category => category.id === importCategoryId)) {
-      return importCategoryId;
-    }
+    if (categories.some(category => category.id === targetCategoryId)) return targetCategoryId;
+    if (categories.some(category => category.id === importCategoryId)) return importCategoryId;
     return categories[0]?.id || '';
   };
 
@@ -221,7 +228,14 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
       if (mode === 'single') {
         const categoryId = resolveSingleTargetCategoryId();
         if (!categoryId) {
-          window.alert(language === 'zh' ? '未找到可用分类，请先创建分类。' : 'No available category found. Please create one first.');
+          showToast({
+            variant: 'warning',
+            title: language === 'zh' ? '缺少分类' : 'Category Required',
+            message:
+              language === 'zh'
+                ? '请先创建一个可用分类。'
+                : 'Please create an available category first.',
+          });
           return;
         }
 
@@ -242,6 +256,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
         }
       } else {
         const categoryMapping = new Map<string, string>();
+
         for (const bookmark of bookmarks) {
           const normalizedUrl = normalizeUrl(bookmark.url);
           if (!normalizedUrl || existingUrls.has(normalizedUrl)) {
@@ -255,21 +270,30 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
             categoryId = await ensureCategory(folderName);
             categoryMapping.set(folderName, categoryId);
           }
+
           await addSite(createSiteFromBookmark(bookmark, categoryId));
           existingUrls.add(normalizedUrl);
           importedCount += 1;
         }
       }
 
-      window.alert(
-        language === 'zh'
-          ? `书签导入完成，共导入 ${importedCount} 条，跳过 ${skippedCount} 条重复网址。`
-          : `Bookmark import completed. Imported ${importedCount} items and skipped ${skippedCount} duplicates.`,
-      );
+      showToast({
+        variant: 'success',
+        title: language === 'zh' ? '书签导入完成' : 'Import Completed',
+        message:
+          language === 'zh'
+            ? `共导入 ${importedCount} 条，跳过 ${skippedCount} 条重复网址。`
+            : `Imported ${importedCount} items and skipped ${skippedCount} duplicates.`,
+      });
+
       onClose();
     } catch (error) {
       console.error('[BookmarksImportModal] Import failed.', error);
-      window.alert(language === 'zh' ? '导入失败，请查看控制台日志。' : 'Import failed. Check console logs.');
+      showToast({
+        variant: 'error',
+        title: language === 'zh' ? '导入失败' : 'Import Failed',
+        message: language === 'zh' ? '请查看控制台日志。' : 'Please check console logs.',
+      });
     } finally {
       setIsImporting(false);
     }
@@ -284,8 +308,8 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('settings.import_bookmarks')}</h2>
             <p className="text-xs text-slate-400 mt-1">
               {language === 'zh'
-                ? '支持谷歌 Chrome 收藏夹 HTML，兼容多数浏览器导出的书签格式。'
-                : 'Supports Google Chrome bookmark HTML and most Netscape bookmark export formats.'}
+                ? '支持 Chrome/Netscape 书签 HTML，兼容多数浏览器导出的书签格式。'
+                : 'Supports Chrome/Netscape bookmark HTML export formats.'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-white/40 dark:hover:bg-white/10 text-slate-500">
@@ -293,50 +317,68 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
           </button>
         </div>
 
-        <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+        <div className="p-8 space-y-5 max-h-[72vh] overflow-y-auto custom-scrollbar">
           <div>
-            <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{t('settings.bookmark_file')}</p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={openFilePicker}
-                className="px-4 py-2.5 rounded-xl bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 text-sm font-semibold text-slate-700 dark:text-slate-100 hover:bg-white/80"
-              >
+            <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+              {t('settings.bookmark_file')}
+            </p>
+            <div className="flex items-center justify-between gap-3 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 rounded-xl px-4 py-3">
+              <button onClick={openFilePicker} className="px-4 py-2 rounded-lg bg-brand-light/50 text-brand-DEFAULT font-semibold text-sm hover:bg-brand-light/70">
                 {t('settings.select_file')}
               </button>
-              <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{fileName || t('settings.no_file')}</span>
+              <span className="text-xs text-slate-500 truncate">{fileName || t('settings.no_file')}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="text/html,.html"
+                className="hidden"
+                onChange={event => {
+                  void handleFileChange(event);
+                }}
+              />
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="text/html,.html"
-              className="hidden"
-              onChange={event => { void handleFileChange(event); }}
-            />
           </div>
 
           <div>
-            <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{t('settings.import_mode')}</p>
+            <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+              {t('settings.import_mode')}
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
                 onClick={() => setMode('single')}
-                className={`rounded-xl border px-4 py-3 text-left transition-all ${mode === 'single' ? 'border-brand-DEFAULT bg-brand-light/50 text-brand-DEFAULT' : 'border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/20 text-slate-500'}`}
+                className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                  mode === 'single'
+                    ? 'border-brand-DEFAULT bg-brand-light/50 text-brand-DEFAULT'
+                    : 'border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/20 text-slate-500'
+                }`}
               >
                 <div className="font-semibold text-sm">{t('settings.mode_single')}</div>
-                <div className="text-xs opacity-80 mt-1">{language === 'zh' ? '默认导入到“导入分类”，可手动切换。' : 'Import into one category (default imported category).'}</div>
+                <div className="text-xs opacity-80 mt-1">
+                  {language === 'zh' ? '导入到单一分类（可切换默认导入分类）。' : 'Import into one category.'}
+                </div>
               </button>
+
               <button
                 onClick={() => setMode('folder')}
-                className={`rounded-xl border px-4 py-3 text-left transition-all ${mode === 'folder' ? 'border-brand-DEFAULT bg-brand-light/50 text-brand-DEFAULT' : 'border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/20 text-slate-500'}`}
+                className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                  mode === 'folder'
+                    ? 'border-brand-DEFAULT bg-brand-light/50 text-brand-DEFAULT'
+                    : 'border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/20 text-slate-500'
+                }`}
               >
                 <div className="font-semibold text-sm">{t('settings.mode_folder')}</div>
-                <div className="text-xs opacity-80 mt-1">{language === 'zh' ? '可选：按书签目录自动建分类。' : 'Optional: auto-create categories from bookmark folders.'}</div>
+                <div className="text-xs opacity-80 mt-1">
+                  {language === 'zh' ? '按书签文件夹自动创建/匹配分类。' : 'Auto-create/match categories by folder.'}
+                </div>
               </button>
             </div>
           </div>
 
           {mode === 'single' && (
             <div>
-              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">{t('settings.default_import_category')}</p>
+              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                {t('settings.default_import_category')}
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
                 <select
                   value={targetCategoryId}
@@ -344,12 +386,18 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
                   className="w-full bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm"
                 >
                   {categories.map(category => (
-                    <option key={category.id} value={category.id}>{t(category.name)}</option>
+                    <option key={category.id} value={category.id}>
+                      {t(category.name)}
+                    </option>
                   ))}
                 </select>
                 <button
                   onClick={() => setRememberAsDefault(value => !value)}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold border ${rememberAsDefault ? 'border-brand-DEFAULT text-brand-DEFAULT bg-brand-light/40' : 'border-white/40 dark:border-white/10 text-slate-500'}`}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold border ${
+                    rememberAsDefault
+                      ? 'border-brand-DEFAULT text-brand-DEFAULT bg-brand-light/40'
+                      : 'border-white/40 dark:border-white/10 text-slate-500'
+                  }`}
                 >
                   {language === 'zh' ? '记住为默认' : 'Remember as default'}
                 </button>
@@ -368,7 +416,7 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
               <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
                 {language === 'zh'
                   ? '导入时若数据库已存在相同 URL，会自动跳过重复项。'
-                  : 'If a URL already exists in database, import will skip that duplicate.'}
+                  : 'If URL already exists, import will skip duplicates.'}
               </p>
             </div>
           )}
@@ -379,7 +427,9 @@ const BookmarksImportModal: React.FC<BookmarksImportModalProps> = ({ isOpen, onC
             {language === 'zh' ? '取消' : 'Cancel'}
           </button>
           <button
-            onClick={() => { void runImport(); }}
+            onClick={() => {
+              void runImport();
+            }}
             disabled={isImporting || bookmarks.length === 0}
             className="px-5 py-2.5 rounded-xl font-bold text-white bg-slate-900 dark:bg-white dark:text-black disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >

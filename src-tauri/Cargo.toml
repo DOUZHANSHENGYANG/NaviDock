@@ -25,3 +25,7 @@ tauri = { version = "2.10.0", features = [] }
 tauri-plugin-log = "2"
 rusqlite = { version = "0.33.0", features = ["bundled"] }
 uuid = { version = "1.18.1", features = ["v4", "fast-rng"] }
+open = "5"
+rfd = "0.15"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+scraper = "0.22"

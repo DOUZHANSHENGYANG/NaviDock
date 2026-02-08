@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { NavProvider } from './context/NavContext';
+import { ToastProvider } from './context/ToastContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -11,8 +12,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <NavProvider>
-      <App />
-    </NavProvider>
+    <ToastProvider>
+      <NavProvider>
+        <App />
+      </NavProvider>
+    </ToastProvider>
   </React.StrictMode>
 );
