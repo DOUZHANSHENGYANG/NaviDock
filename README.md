@@ -70,12 +70,6 @@ npm run release:win
 - 导出：下载 `navidock-config-*.json`
 - 导入：选择 JSON 文件，导入后自动刷新当前状态（桌面模式会同步写入 SQLite）
 
-## 文档
-
-- 规划文档：`docs/plans/`
-- 数据库设计：`docs/database/`
-- 任务清单：`docs/checklists/`
-
 ## Worktree 工作流（已采用）
 
 当前开发分支通过 `git worktree` 创建，建议后续继续沿用隔离开发：
